@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>职场压力源深度测评</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            /* 核心配色：粉紫渐变 */
+            --gradient-main: linear-gradient(135deg, #FF8CC6 0%, #9F6AD4 100%);
+            --primary-purple: #9F6AD4;
+            --primary-pink: #FF8CC6;
+            --text-dark: #333333;
+            --text-gray: #666666;
+            --bg-color: #F8F5FA;
+            --card-shadow: 0 8px 24px rgba(159, 106, 212, 0.08);
+            --danger-color: #FF4D4F;
+            --tag-bg-purple: #8E44AD;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased; /* 让字体更清晰 */
+        }
+
+        /* 主容器 */
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: #FFFFFF;
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            position: relative;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 800px;
+        }
+
+        /* 截图专用模式：当添加了 capturing 类时，去除圆角和阴影，保证清晰度 */
+        .container.capturing {
+            border-radius: 0;
+            box-shadow: none;
+            padding: 40px 30px; /* 增加截图时的内边距，更美观 */
+            background: #FFFFFF !important; /* 强制纯白背景 */
+        }
+        
+        /* 截图时强制文字颜色，防止变淡 */
+        .container.capturing * {
+            color: #333333 !important;
+            text-shadow: none !important;
+        }
+        .container.capturing .tag-pill, 
+        .container.capturing .btn-gradient,
+        .container.capturing .dim-score.high,
+        .container.capturing .high-pressure-tag,
+        .container.capturing .kit-tag {
+            /* 保持 colored 元素的颜色，不强制变黑 */
+            color: white !important; 
+        }
+        .container.capturing .dim-score.high { color: #FF4D4F !important; }
+        .container.capturing .high-pressure-tag { color: #FF4D4F !important; }
+        .container.capturing .stat-num { color: #E85D96 !important; }
+        .container.capturing .main-title { 
+            background: none; 
+            -webkit-text-fill-color: #9F6AD4; /* 截图时渐变字可能出问题，改用纯紫 */
+            color: #9F6AD4 !important;
+        }
+
+
+        /* 屏幕切换 */
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            animation: fadeIn 0.4s ease;
+        }
+        .screen.active { display: flex; }
+
+        /* 按钮 */
+        .btn-gradient {
+            background: var(--gradient-main);
+            color: white;
+            border: none;
+            padding: 15px 0;
+            width: 100%;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(255, 140, 198, 0.3);
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .btn-outline {
+            background: #fff;
+            color: var(--text-gray);
+            border: 1px solid #ddd;
+            padding: 15px 0;
+            width: 100%;
+            border-radius: 50px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* 首页元素 */
+        .home-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #FDF2F8, #F3E5F5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .main-title {
+            font-size: 28px;
+            font-weight: 800;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .tags-row { display: flex; gap: 15px; margin-bottom: 30px; font-size: 13px; color: var(--text-gray); }
+        .tag-pill { background: #F5F5F5; padding: 5px 15px; border-radius: 20px; color: #666; }
+        .tag-pill.highlight { color: var(--primary-purple); background: #F3E5F5; font-weight: bold; }
+
+        .desc-text {
+            text-align: center; font-size: 15px; color: var(--text-gray); line-height: 1.6; margin-bottom: 30px; padding: 0 10px;
+        }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; margin-bottom: 40px; }
+        .stat-card { background: #FAFAFA; border: 1px solid #F0F0F0; border-radius: 16px; padding: 16px 5px; text-align: center; }
+        .stat-num { font-size: 22px; font-weight: 700; color: #E85D96; margin-bottom: 5px; }
+        .stat-label { font-size: 12px; color: #999; }
+
+        /* 答题页元素 */
+        .progress-bar-bg { width: 100%; height: 8px; background: #F0F0F0; border-radius: 4px; margin-bottom: 25px; }
+        .progress-fill { height: 100%; background: var(--gradient-main); width: 0%; border-radius: 4px; transition: width 0.3s; }
+        .q-text { font-size: 19px; font-weight: 600; margin-bottom: 40px; line-height: 1.5; min-height: 60px; color: #333; }
+        .option-item {
+            padding: 16px; margin-bottom: 12px; border: 1px solid #EEE; border-radius: 12px; font-size: 16px; cursor: pointer; background: #fff; color: #555;
+        }
+        .option-item:hover { border-color: var(--primary-purple); background: #FDF9FF; color: var(--primary-purple); }
+
+        /* 结果页元素 */
+        .result-top-card {
+            background: #FBF9FC; border-radius: 16px; padding: 25px 20px; width: 100%; margin-bottom: 25px; text-align: center; border: 1px solid #F3E5F5;
+        }
+        .status-title { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .status-desc { font-size: 14px; color: #666; margin-bottom: 20px; padding: 0 10px; line-height: 1.5; }
+        .chart-wrapper { position: relative; height: 260px; width: 100%; margin: 0 auto; }
+
+        /* 锦囊 */
+        .kit-section {
+            width: 100%; background: #FFF0F6; border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid #FFE4EF;
+        }
+        .kit-header { font-size: 16px; font-weight: 700; margin-bottom: 15px; color: #333; display: flex; align-items: center; gap: 8px; }
+        .kit-item { margin-bottom: 15px; display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.6; color: #444; }
+        .kit-tag { background: var(--tag-bg-purple); color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; margin-top: 2px; }
+
+        /* 维度列表 */
+        .dim-section-title {
+            width: 100%; font-size: 17px; font-weight: 700; margin-bottom: 15px; border-left: 5px solid #E85D96; padding-left: 12px; color: #333;
+        }
+        .dim-card {
+            width: 100%; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .dim-info { flex: 1; padding-right: 15px; }
+        .dim-name { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .dim-desc { font-size: 13px; color: #888; line-height: 1.4; }
+        .dim-score { font-size: 20px; font-weight: 700; color: #666; }
+        
+        .high-pressure-tag { background: #FFF1F0; color: var(--danger-color); border: 1px solid #FFCCC7; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: normal; }
+        .dim-score.high { color: var(--danger-color); }
+
+        /* 底部操作区 (截图时隐藏) */
+        .bottom-actions { margin-top: 30px; width: 100%; display: flex; flex-direction: column; gap: 15px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container" id="capture-target">
+    
+    <div id="welcome-screen" class="screen active">
+        <div class="home-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9F6AD4" stroke-width="2.5"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+        </div>
+        
+        <h1 class="main-title">职场压力源测评</h1>
+        
+        <div class="tags-row">
+            <span class="tag-pill highlight">6大维度</span>
+            <span class="tag-pill">建议用时 10 分钟</span>
+        </div>
+
+        <p class="desc-text">本测评基于心理学压力模型，为您精准定位压力核心，生成专属的“职场生存画像”。</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-num">50</div>
+                <div class="stat-label">精选题目</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">6</div>
+                <div class="stat-label">分析维度</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">100%</div>
+                <div class="stat-label">定制建议</div>
+            </div>
+        </div>
+
+        <button class="btn-gradient" onclick="startQuiz()">开始测评</button>
+
+        <div style="margin-top: 40px; background: #F9F9F9; padding: 20px; border-radius: 12px; width:100%;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 14px;">📄 测评说明</div>
+            <div style="font-size: 12px; color: #888; line-height: 1.8;">
+                ● 本测评包含50道关于工作状态与心理感受的题目。<br>
+                ● 请凭第一直觉选择最符合您 **最近一个月** 真实情况的选项。<br>
+                ● 结果仅用于个人复盘参考，严格保护隐私。
+            </div>
+        </div>
+    </div>
+
+    <div id="quiz-screen" class="screen">
+        <div class="progress-bar-bg"><div id="progress-bar" class="progress-fill"></div></div>
+        <div style="font-size: 13px; color: #999; margin-bottom: 10px; width:100%;">进度 <span id="current-num">1</span> / 50</div>
+        
+        <div style="flex: 1; width: 100%; display: flex; flex-direction: column;">
+            <div id="question-text" class="q-text">题目加载中...</div>
+            <div class="option-item" onclick="selectOption(1)">1. 非常不同意</div>
+            <div class="option-item" onclick="selectOption(2)">2. 不太同意</div>
+            <div class="option-item" onclick="selectOption(3)">3. 不确定</div>
+            <div class="option-item" onclick="selectOption(4)">4. 比较同意</div>
+            <div class="option-item" onclick="selectOption(5)">5. 非常同意</div>
+        </div>
+    </div>
+
+    <div id="result-screen" class="screen">
+        
+        <div class="result-top-card">
+            <div class="status-title">
+                <span id="persona-icon"></span> 
+                <span id="persona-text"></span>
+            </div>
+            <div class="status-desc" id="persona-desc"></div>
+            
+            <div class="chart-wrapper">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </div>
+
+        <div class="kit-section" id="advice-section" style="display:none;">
+            <div class="kit-header">🎁 您的职场生存锦囊 (定制版)</div>
+            <div id="advice-list">
+                </div>
+        </div>
+
+        <div class="dim-section-title">六大职场维度深度解析</div>
+        <div id="dim-list-container" style="width:100%;">
+            </div>
+
+        <div class="bottom-actions" data-html2canvas-ignore="true">
+            <button class="btn-gradient" onclick="saveAsImage()">📸 保存高清长图 (推荐)</button>
+            <button class="btn-outline" onclick="location.reload()">🔄 重新测试</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- 题库 ---
+    const questions = [
+        // 1-8 工作负荷
+        {t: "我的工作量经常超出我能负荷的范围。", d: 1}, {t: "为了按时完成任务，我经常需要加班或把工作带回家。", d: 1},
+        {t: "工作中经常出现突发状况，打乱原本的计划。", d: 1}, {t: "每天的工作节奏太快，让我几乎没有喘息的时间。", d: 1},
+        {t: "我需要在极短的时间内处理大量的信息或数据。", d: 1}, {t: "由于人手不足，我经常需要承担不属于我职责范围的工作。", d: 1},
+        {t: "在这个岗位上，我时刻感到时间不够用。", d: 1}, {t: "工作对我的脑力或体力消耗极大，让我精疲力竭。", d: 1},
+        // 9-16 角色自主
+        {t: "我对自己的岗位职责和考核标准不够清晰。", d: 2}, {t: "我经常接到来自不同领导的、互相冲突的工作指令。", d: 2},
+        {t: "我感觉自己在工作中没有什么决策权，只能被动执行。", d: 2}, {t: "上级对我管得太细（微观管理），让我觉得不受信任。", d: 2},
+        {t: "我不清楚领导对我工作的期望到底是什么。", d: 2}, {t: "在处理工作中遇到的问题时，我缺乏必要的资源或权限。", d: 2},
+        {t: "我感觉自己像一颗“螺丝钉”，工作内容单调且重复。", d: 2}, {t: "公司的政策或流程经常变动，让我无所适从。", d: 2},
+        // 17-24 人际沟通
+        {t: "我感到很难获得上级的支持和理解。", d: 3}, {t: "同事之间缺乏必要的协作，经常出现推诿扯皮。", d: 3},
+        {t: "我觉得在公司里即使努力工作，也不会被看到或认可。", d: 3}, {t: "办公室的氛围比较压抑，大家很少真诚交流。", d: 3},
+        {t: "我需要花费大量精力去处理复杂的人际关系。", d: 3}, {t: "当我遇到工作困难时，很难找到人求助。", d: 3},
+        {t: "我感觉自己被团队孤立，或者很难融入集体。", d: 3}, {t: "与某些特定同事或客户的沟通让我感到非常心累。", d: 3},
+        // 25-32 职业发展
+        {t: "我看不到自己在目前公司的晋升空间或发展路径。", d: 4}, {t: "我经常担心自己会失业，或者被边缘化。", d: 4},
+        {t: "目前的工作无法让我学到新技能，感觉自己在原地踏步。", d: 4}, {t: "即使我表现出色，薪资待遇也没有相应的提升。", d: 4},
+        {t: "我觉得目前的行业或公司前景堪忧。", d: 4}, {t: "我对自己的职业未来感到迷茫，不知道下一步该怎么走。", d: 4},
+        {t: "公司内部的竞争非常激烈，让我时刻处于紧绷状态。", d: 4}, {t: "我觉得自己的才能在目前的工作中被浪费了。", d: 4},
+        // 33-40 生活平衡
+        {t: "下班后或周末，我仍然需要随时回复工作消息。", d: 5}, {t: "想到第二天要上班，我会在前一天晚上感到焦虑。", d: 5},
+        {t: "工作耗尽了我的精力，让我无暇顾及家庭或朋友。", d: 5}, {t: "我很难在休假时完全放松，脑子里还在想工作的事。", d: 5},
+        {t: "因为工作原因，我不得不牺牲自己的兴趣爱好。", d: 5}, {t: "我的家人或朋友抱怨我在工作上花的时间太多。", d: 5},
+        {t: "我感觉生活被工作填满，失去了属于自己的空间。", d: 5}, {t: "即使身体不舒服，我也不敢轻易请假。", d: 5},
+        // 41-50 身心反馈
+        {t: "最近我经常感到莫名的烦躁或易怒。", d: 6}, {t: "早上醒来时，我感到疲惫，不想去公司。", d: 6},
+        {t: "我经常感到头痛、胃痛或颈椎不舒服。", d: 6}, {t: "我最近的睡眠质量变差，入睡困难或多梦易醒。", d: 6},
+        {t: "我对工作失去了热情，只是在机械地应付。", d: 6}, {t: "面对新的工作任务，我第一反应往往是抗拒或害怕。", d: 6},
+        {t: "我感觉自己的记忆力在下降，经常丢三落四。", d: 6}, {t: "我变得比以前更敏感，容易因为小事感到委屈。", d: 6},
+        {t: "我经常感到孤独，觉得没有人能理解我的压力。", d: 6}, {t: "我觉得这种高压状态如果持续下去，我会崩溃。", d: 6}
+    ];
+
+    // 维度详细文案
+    const dimMeta = {
+        1: { name: "工作负荷", desc: "评估“事”多不多。高分意味着你的时间表像俄罗斯方块一样严丝合缝，可能承担了过多“隐形工作”。", advice: "不要追求完美的'做完'，要追求核心的'做对'，学会抓大放小。" },
+        2: { name: "角色自主", desc: "评估“权”大不大。高分意味着你可能处于“工具人”困境，微观管理或职责不清正在扼杀你的主动性。", advice: "如果是微观管理，试着主动汇报进度，用过度沟通换取信任空间。" },
+        3: { name: "人际沟通", desc: "评估“人”好不好处。高分意味着你可能正充当“情绪垃圾桶”，周旋于复杂关系或缺乏支持的环境中。", advice: "建立'职业隔离墙'，不要让同事的情绪成为你的责任。" },
+        4: { name: "职业发展", desc: "评估“奔头”足不足。高分代表“职场迷雾感”，看不清晋升路径或担心被边缘化，这种迷茫比忙碌更累人。", advice: "哪怕不跳槽，也去面试看看，市场反馈是治愈迷茫的良药。" },
+        5: { name: "生活平衡", desc: "评估“边界”清不清。高分意味着你是“全天候待机者”，生活和工作没有了物理隔绝，急需停机维护。", advice: "每天设置1小时'飞行模式'，把大脑还给自己。" },
+        6: { name: "身心反馈", desc: "评估“内耗”重不重。高分代表“躯体化预警”，失眠、易怒、疲惫都是身体在替你发出的求救信号。", advice: "身体比大脑更诚实。如果感到莫名的烦躁，请立刻停下来深呼吸。" }
+    };
+
+    let currentQuestionIndex = 0;
+    let totalScore = 0;
+    let dimScores = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
+    const dimCounts = {1:8, 2:8, 3:8, 4:8, 5:8, 6:10};
+
+    function startQuiz() {
+        document.getElementById('welcome-screen').classList.remove('active');
+        document.getElementById('quiz-screen').classList.add('active');
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        const q = questions[currentQuestionIndex];
+        document.getElementById('question-text').textContent = q.t;
+        document.getElementById('current-num').textContent = currentQuestionIndex + 1;
+        document.getElementById('progress-bar').style.width = ((currentQuestionIndex) / questions.length) * 100 + '%';
+    }
+
+    function selectOption(val) {
+        const q = questions[currentQuestionIndex];
+        totalScore += val;
+        dimScores[q.d] += val;
+        currentQuestionIndex++;
+        if(currentQuestionIndex < questions.length) renderQuestion();
+        else showResults();
+    }
+
+    function showResults() {
+        document.getElementById('quiz-screen').classList.remove('active');
+        document.getElementById('result-screen').classList.add('active');
+
+        // 计算逻辑
+        const dimAvgs = {};
+        const labels = [];
+        const dataPoints = [];
+        let highRiskDims = [];
+
+        for(let i=1; i<=6; i++) {
+            const avg = (dimScores[i] / dimCounts[i]).toFixed(1);
+            dimAvgs[i] = avg;
+            labels.push(dimMeta[i].name);
+            dataPoints.push(avg);
+            if(avg >= 3.5) highRiskDims.push({id: i, score: avg}); 
+        }
+
+        // 总画像
+        let pText="", pDesc="", pIcon="";
+        if(totalScore <= 100) { pIcon="🌸"; pText="松弛感·天选打工人"; pDesc="状态：满电续航。工作边界感极佳，心态稳如卡皮巴拉。"; }
+        else if(totalScore <= 150) { pIcon="🔋"; pText="且行且看·隐形耗电体"; pDesc="状态：低电量运行。表面情绪稳定，但内心常有疲惫感，建议安排停机维护。"; }
+        else if(totalScore <= 200) { pIcon="🔥"; pText="高压过载·职场特种兵"; pDesc="状态：过热预警。责任感让你扛下了太多，身体的账单往往是最贵的。"; }
+        else { pIcon="🚨"; pText="即将熔断·超级计算机"; pDesc="状态：紧急制动。警报拉响！现在的环境可能在透支你的健康。"; }
+        
+        document.getElementById('persona-icon').textContent = pIcon;
+        document.getElementById('persona-text').textContent = pText;
+        document.getElementById('persona-desc').textContent = pDesc;
+
+        // 绘制雷达图
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '压力值',
+                    data: dataPoints,
+                    backgroundColor: 'rgba(255, 140, 198, 0.2)', 
+                    borderColor: '#FF8CC6',
+                    pointBackgroundColor: '#9F6AD4',
+                    pointBorderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: '#eee' },
+                        grid: { color: '#eee' },
+                        suggestedMin: 1, suggestedMax: 5,
+                        pointLabels: { font: {size:12}, color: '#666' }
+                    }
+                },
+                plugins: { legend: {display: false} }
+            }
+        });
+
+        // 锦囊注入
+        const adviceContainer = document.getElementById('advice-list');
+        const adviceSection = document.getElementById('advice-section');
+        let adviceHtml = "";
+        
+        highRiskDims.sort((a,b) => b.score - a.score);
+        let showDims = highRiskDims.length > 0 ? highRiskDims : [{id: 6}, {id: 5}]; 
+
+        showDims.slice(0, 3).forEach(item => { 
+            const info = dimMeta[item.id];
+            adviceHtml += `
+                <div class="kit-item">
+                    <div class="kit-tag">${info.name}</div>
+                    <div style="flex:1;">${info.advice}</div>
+                </div>
+            `;
+        });
+        adviceContainer.innerHTML = adviceHtml;
+        adviceSection.style.display = 'block';
+
+        // 维度列表注入
+        const dimListContainer = document.getElementById('dim-list-container');
+        let dimListHtml = "";
+        
+        for(let i=1; i<=6; i++) {
+            const score = dimAvgs[i];
+            const info = dimMeta[i];
+            const isHigh = score >= 3.5;
+            
+            const tagHtml = isHigh ? `<span class="high-pressure-tag">高压</span>` : ``;
+            const scoreClass = isHigh ? `dim-score high` : `dim-score`;
+
+            dimListHtml += `
+                <div class="dim-card">
+                    <div class="dim-info">
+                        <div class="dim-name">${info.name} ${tagHtml}</div>
+                        <div class="dim-desc">${info.desc}</div>
+                    </div>
+                    <div class="${scoreClass}">${score}</div>
+                </div>
+            `;
+        }
+        dimListContainer.innerHTML = dimListHtml;
+    }
+
+    // --- 高清长图生成 (修复文字看不清问题) ---
+    function saveAsImage() {
+        const element = document.getElementById('capture-target');
+        
+        // 1. 添加截图状态类 (去阴影、强制白底黑字)
+        element.classList.add('capturing');
+
+        window.scrollTo(0,0);
+        
+        // 2. 使用高倍率 scale: 3 保证清晰
+        html2canvas(element, { 
+            scale: 3, 
+            useCORS: true,
+            backgroundColor: "#FFFFFF" // 强制白底
+        }).then(canvas => {
+            // 3. 恢复原始样式
+            element.classList.remove('capturing');
+
+            // 4. 下载图片
+            const link = document.createElement('a');
+            link.download = '职场压力画像.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+</script>
+
+</body>
+</html>
